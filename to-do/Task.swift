@@ -9,7 +9,14 @@
 import Foundation
 import RealmSwift
 
+
 class Task: Object {
+    @objc dynamic var id: Int = 0
+    @objc dynamic var userId: Int = 0
     @objc dynamic var title: String = ""
     @objc dynamic var completed: Bool = false
+    
+    override static func primaryKey() -> String? {
+        return "id"
+    }
 }

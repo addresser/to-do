@@ -9,18 +9,18 @@
 import UIKit
 import Alamofire
 import RealmSwift
-import RxCocoa
 import RxSwift
+import SwiftyJSON
 
 class TaskViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     let tableView: UITableView
-    let alertController: UIAlertController
     let taskViewModel: TaskViewModel
     var notificationToken: NotificationToken?
 
+    let cellIndex: String = "Cell"
+    
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
         tableView = UITableView()
-        alertController = UIAlertController(title: "Новая задача", message: "", preferredStyle: .alert)
         taskViewModel = TaskViewModel()
         
         super.init(nibName: nil, bundle: nil)
@@ -41,8 +41,12 @@ class TaskViewController: UIViewController, UITableViewDelegate, UITableViewData
         view.addSubview(tableView)
         tableView.frame = self.view.frame
         
+        tableView.snp.makeConstraints { (make) in
+            make.center.equalTo(self.view)
+            make.size.equalTo(self.view)
+        }
+        
         subscribeOnUpdate()
-        createAlertController()
     }
     
     private func subscribeOnUpdate() {
@@ -62,32 +66,27 @@ class TaskViewController: UIViewController, UITableViewDelegate, UITableViewData
         }
     }
     
-    private func createAlertController () {
-        alertController.addAction(UIAlertAction(title: "Сохранить", style: .default, handler: { alert -> Void in
-            let textField = self.alertController.textFields![0] as UITextField
-            self.taskViewModel.addEvent.on(.next(textField.text ?? ""))
-
-        }))
-        
-        alertController.addAction(UIAlertAction(title: "Отмена", style: .default, handler: nil))
-        alertController.addTextField(configurationHandler: { (textField : UITextField!) -> Void in textField.placeholder = "Условие задачи" })
+    @objc func addTask() {
+        self.present(TaskFormViewController(viewModel: taskViewModel), animated: true, completion: nil)
     }
-    
+
     @objc func getTaskList() {
         AF.request(Constants.TASK_LIST_URL, method: .get)
             .validate()
             .responseJSON { (response) -> Void in
                 switch response.result {
-                case .success:
-                    self.taskViewModel.getEvent.on(.next(response.value as! NSArray))
+                case .success(let value):
+                    for (_, data) in JSON(value) {
+                        var taskObj = data.dictionaryObject!
+                        taskObj["completed"] = Bool(exactly: taskObj["completed"] as! NSNumber)!
+                        taskObj["id"] = self.taskViewModel.incrementID()
+                        
+                        self.taskViewModel.addEvent.on(.next(taskObj))
+                    }
                 case .failure(let error):
                     print(error)
                 }
             }
-    }
-    
-    @objc func addTask() {
-        self.present(alertController, animated: true, completion: nil)
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -95,7 +94,7 @@ class TaskViewController: UIViewController, UITableViewDelegate, UITableViewData
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell") ?? UITableViewCell(style: .default, reuseIdentifier: "Cell")
+        let cell = tableView.dequeueReusableCell(withIdentifier: cellIndex) ?? UITableViewCell(style: .default, reuseIdentifier: cellIndex)
         cell.selectionStyle = .none
         let taskData = taskViewModel.tasks[indexPath.row]
         cell.textLabel?.text = taskData.title

@@ -9,13 +9,13 @@
 import Foundation
 import RxSwift
 import RealmSwift
+import SwiftyJSON
 
 struct TaskViewModel {
     let realm: Realm
     let tasks: Results<Task>
     
-    var getEvent: PublishSubject<NSArray> = PublishSubject()
-    var addEvent: PublishSubject<String> = PublishSubject()
+    var addEvent: PublishSubject<Dictionary<String, Any>> = PublishSubject()
     var changeEvent: PublishSubject<Int> = PublishSubject()
     var deleteEvent: PublishSubject<Int> = PublishSubject()
     
@@ -27,22 +27,13 @@ struct TaskViewModel {
         realm = try! Realm()
         tasks = realm.objects(Task.self).sorted(byKeyPath: "title", ascending: false)
 
-        _ = getEvent.subscribe(handler(clojure: getTasks))
         _ = addEvent.subscribe(handler(clojure: addTask))
         _ = changeEvent.subscribe(handler(clojure: changeTask))
         _ = deleteEvent.subscribe(handler(clojure: deleteTask))
     }
     
-    private func getTasks (value: NSArray)  -> Void {
-        for task in value {
-            try! self.realm.write {
-                self.realm.add(Task(value: task))
-            }
-        }
-    }
-    
-    private func addTask (value: String)  -> Void {
-        let task = Task(value: ["title": value])
+    private func addTask (taskData: Dictionary<String, Any>)  -> Void {
+        let task = Task(value: taskData)
         
         try! self.realm.write {
             self.realm.add(task)
@@ -76,5 +67,9 @@ struct TaskViewModel {
                 print("completed!")
             }
         }
+    }
+    
+    func incrementID() -> Int {
+        return (realm.objects(Task.self).max(ofProperty: "id") as Int? ?? 0) + 1
     }
 }
